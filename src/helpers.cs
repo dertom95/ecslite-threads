@@ -7,27 +7,31 @@
 using System;
 using System.Threading;
 
-namespace Leopotam.EcsLite.Threads {
-    static class ThreadService {
+namespace Leopotam.EcsLite.Threads
+{
+    static class ThreadService
+    {
         static ThreadDesc[] _descs;
         static ThreadWorkerHandler _task;
         static readonly int DescsCount;
 
-        static ThreadService () {
+        static ThreadService()
+        {
             DescsCount = Environment.ProcessorCount;
             _descs = new ThreadDesc[DescsCount];
             for (var i = 0; i < _descs.Length; i++) {
                 ref var desc = ref _descs[i];
-                desc.Thread = new Thread (ThreadProc) { IsBackground = true };
-                desc.HasWork = new ManualResetEvent (false);
-                desc.WorkDone = new ManualResetEvent (true);
-                desc.Thread.Start (i);
+                desc.Thread = new Thread(ThreadProc) { IsBackground = true };
+                desc.HasWork = new ManualResetEvent(false);
+                desc.WorkDone = new ManualResetEvent(true);
+                desc.Thread.Start(i);
             }
         }
 
-        public static void Run(ThreadWorkerHandler worker, int count, int chunkSize) {
+        public static void Run(ThreadWorkerHandler worker, int count, int chunkSize)
+        {
 #if DEBUG
-            if (_task != null) { throw new Exception ("Calls from multiple threads not supported."); }
+            if (_task != null) { throw new Exception("Calls from multiple threads not supported."); }
 #endif
             if (count <= 0 || chunkSize <= 0) {
                 return;
@@ -39,7 +43,8 @@ namespace Leopotam.EcsLite.Threads {
             int workersCount;
             if (jobSize > chunkSize) {
                 workersCount = DescsCount;
-            } else {
+            }
+            else {
                 workersCount = count / chunkSize;
                 jobSize = chunkSize;
             }
@@ -51,36 +56,40 @@ namespace Leopotam.EcsLite.Threads {
                 desc.FromIndex = processed;
                 processed += jobSize;
                 desc.BeforeIndex = processed;
-                desc.WorkDone.Reset ();
-                desc.HasWork.Set ();
+                desc.WorkDone.Reset();
+                desc.HasWork.Set();
             }
             ref var lastDesc = ref _descs[workersCount - 1];
             lastDesc.FromIndex = processed;
             lastDesc.BeforeIndex = count;
-            lastDesc.WorkDone.Reset ();
-            lastDesc.HasWork.Set ();
+            lastDesc.WorkDone.Reset();
+            lastDesc.HasWork.Set();
 
             for (int i = 0, iMax = workersCount; i < iMax; i++) {
-                _descs[i].WorkDone.WaitOne ();
+                _descs[i].WorkDone.WaitOne();
             }
             _task = null;
         }
 
-        static void ThreadProc (object raw) {
-            ref var desc = ref _descs[(int) raw];
+        static void ThreadProc(object raw)
+        {
+            ref var desc = ref _descs[(int)raw];
             try {
                 while (Thread.CurrentThread.IsAlive) {
-                    desc.HasWork.WaitOne ();
-                    desc.HasWork.Reset ();
-                    _task.Invoke (desc.FromIndex, desc.BeforeIndex);
-                    desc.WorkDone.Set ();
+                    desc.HasWork.WaitOne();
+                    desc.HasWork.Reset();
+                    _task.Invoke(desc.FromIndex, desc.BeforeIndex);
+                    desc.WorkDone.Set();
                 }
-            } catch {
+            }
+            catch (Exception e) {
+                Console.WriteLine($"Exception: {e.Message}\n{e.StackTrace}");
                 // ignored
             }
         }
 
-        struct ThreadDesc {
+        struct ThreadDesc
+        {
             public Thread Thread;
             public ManualResetEvent HasWork;
             public ManualResetEvent WorkDone;
@@ -89,5 +98,5 @@ namespace Leopotam.EcsLite.Threads {
         }
     }
 
-    delegate void ThreadWorkerHandler (int fromIndex, int beforeIndex);
+    delegate void ThreadWorkerHandler(int fromIndex, int beforeIndex);
 }
